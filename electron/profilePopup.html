@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+    <title>Perfil</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .card {
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: calc(100% - 8px);
+        height: calc(100% - 8px);
+        padding: 0 16px;
+        border: 1px solid #2c3036;
+        border-radius: 8px;
+        background: rgb(24 27 31 / 0.97);
+        color: #d9dce0;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+      }
+      .card.visible { opacity: 1; }
+      .led { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--c, #8a7fd4); }
+      .text { min-width: 0; }
+      .name {
+        overflow: hidden;
+        font-size: 14px;
+        font-weight: 600;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+      .dpi { margin-top: 2px; font-size: 12px; color: #8b9099; font-variant-numeric: tabular-nums; }
+      .dpi b { color: #d9dce0; font-weight: 500; }
+      .dpi .sep { margin: 0 4px; color: #4a4f57; }
+    </style>
+  </head>
+  <body>
+    <div class="card" id="card">
+      <span class="led"></span>
+      <div class="text">
+        <div class="name" id="name"></div>
+        <div class="dpi"><b id="dpi"></b> DPI <span class="sep">·</span> <b class="rate" id="rate"></b> Hz</div>
+      </div>
+    </div>
+    <script>
+      const card = document.getElementById('card')
+      // Chamado pelo processo principal a cada ativação.
+      window.render = ({ name, dpi, pollingRate, color }) => {
+        card.style.setProperty('--c', color)
+        document.getElementById('name').textContent = name
+        document.getElementById('dpi').textContent = dpi.toLocaleString('pt-BR')
+        document.getElementById('rate').textContent = pollingRate.toLocaleString('pt-BR')
+        // Reinicia a animação mesmo se o popup ainda estiver visível.
+        card.classList.remove('visible')
+        void card.offsetWidth
+        card.classList.add('visible')
+      }
+      window.fadeOut = () => card.classList.remove('visible')
+    </script>
+  </body>
+</html>

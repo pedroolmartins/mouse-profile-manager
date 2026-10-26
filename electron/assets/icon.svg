@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Ícone do Mouse Profile Manager: mouse em traço sobre fundo escuro arredondado;
+       a roda de rolagem usa o tom de destaque do app. Fonte do icon.png (gerado). -->
+  <rect x="12" y="12" width="232" height="232" rx="54" fill="#1b1e23" stroke="#2e3238" stroke-width="3" />
+  <g fill="none" stroke="#d9dce0" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M128 50c29 0 52 23 52 58v40c0 35-23 58-52 58s-52-23-52-58v-40c0-35 23-58 52-58Z" />
+    <path d="M128 52v44M78 98h100" />
+  </g>
+  <rect x="120" y="64" width="16" height="26" rx="8" fill="#8a7fd4" />
+</svg>

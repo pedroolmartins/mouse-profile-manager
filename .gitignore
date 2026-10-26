@@ -1,0 +1,6 @@
+node_modules/
+dist/
+# Instaladores ficam nas Releases do GitHub, não no repositório.
+release/
+.claude/
+*.log

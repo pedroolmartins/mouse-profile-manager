@@ -1,0 +1,59 @@
+{
+  "name": "v8s",
+  "productName": "Mouse Profile Manager",
+  "version": "0.2.0",
+  "description": "Gerenciador de perfis para mouses (Scyrox V8S, Kysona Mercury Pro)",
+  "author": "Mouse Profile Manager contributors",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k -n vite,electron \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "build": "vite build",
+    "start": "vite build && electron .",
+    "dist": "vite build && electron-builder --win nsis"
+  },
+  "dependencies": {
+    "pinia": "^2.3.1",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^33.3.1",
+    "electron-builder": "^25.1.8",
+    "vite": "^6.0.7",
+    "wait-on": "^8.0.2"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
+  },
+  "build": {
+    "appId": "com.v8s.settings",
+    "productName": "Mouse Profile Manager",
+    "directories": {
+      "output": "release/${version}"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "src/hid/constants.js",
+      "src/devices/kysona/protocol.js",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "electron/assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Mouse Profile Manager"
+    }
+  }
+}
