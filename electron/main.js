@@ -53,6 +53,11 @@ function createWindow({ show = true } = {}) {
       contextIsolation: true,
       nodeIntegration: false,
       preload: path.join(__dirname, 'preload.cjs'),
+      // A janela passa a maior parte do tempo escondida na bandeja, e é ela que troca
+      // os perfis. Com o padrão, o Chromium atrasa os timers de janelas ocultas (até
+      // 1 por minuto depois de alguns minutos) e as pausas entre os comandos ao mouse
+      // fariam a troca de perfil por app em foco demorar.
+      backgroundThrottling: false,
     },
   })
   mainWindow = win
