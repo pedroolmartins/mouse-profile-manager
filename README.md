@@ -4,10 +4,12 @@ App de desktop para Windows que gerencia perfis de mouses gamer direto pelo USB,
 
 Mouses suportados:
 
-| Mouse | Conexão | Modo custom | Modo nativo |
-|---|---|---|---|
-| **Scyrox V8S** (PAW3955) | cabo e receptor 2.4G | ✓ | ✓ (4 perfis) |
-| **Kysona Mercury Pro** (PAW3395, chip PAN1080) | cabo e receptor 2.4G 8K | ✓ | ✓ (8 perfis) |
+| Mouse | Conexão |
+|---|---|
+| **Scyrox V8S** (PAW3955) | cabo e receptor 2.4G |
+| **Kysona Mercury Pro** (PAW3395, chip PAN1080) | cabo e receptor 2.4G 8K |
+
+Os perfis são do app (modo custom): o app grava o perfil escolhido no mouse a cada troca. O modo nativo (usar os perfis guardados no próprio mouse) foi desabilitado na 0.2.2: se mostrou muito instável, principalmente no Kysona, e com os perfis do app acaba sendo desnecessário.
 
 > Projeto independente, sem relação com a Scyrox ou a Kysona. Os protocolos foram estudados a partir do tráfego USB e do código público dos hubs oficiais. Use por sua conta e risco.
 
@@ -15,11 +17,11 @@ Mouses suportados:
 
 Os dois mouses guardam poucos perfis na memória e são configurados por hubs que rodam no navegador (WebHID). Eles servem para configurar o mouse uma vez, mas não para usar perfis no dia a dia. O Mouse Profile Manager fica na bandeja do Windows e:
 
-- mantém **quantos perfis você quiser** (modo custom) e grava o perfil escolhido no mouse na hora;
+- mantém **quantos perfis você quiser** e grava o perfil escolhido no mouse na hora;
 - **troca de perfil sozinho conforme o programa em foco** (ex.: um perfil para cada jogo) e volta ao anterior quando você sai dele;
 - deixa o **botão inferior do mouse trocar de perfil**, em vez de só fazer o DPI Loop;
-- mostra **um aviso a cada troca** (popup junto ao ponteiro ou notificação do Windows), com nome, DPI e polling rate;
-- mostra **bateria**, conexão (cabo / sem fio / em repouso) e versões de firmware;
+- mostra **um aviso a cada troca** (popup junto ao ponteiro ou notificação do Windows), com o mouse, o perfil, o DPI e o polling rate;
+- mostra **bateria**, conexão (cabo / sem fio / em sleep), versões de firmware e qual mouse está **em uso**;
 - inicia com o Windows, minimizado na bandeja.
 
 ## Problemas dos hubs oficiais que ele resolve
@@ -27,34 +29,31 @@ Os dois mouses guardam poucos perfis na memória e são configurados por hubs qu
 ### Gerais (Scyrox e Kysona)
 - **Precisam do navegador aberto**: são páginas web; fechou a aba, acabou a configuração. Este app roda em segundo plano, na bandeja.
 - **Sem troca automática por programa**: nenhum dos hubs troca de perfil conforme o jogo/programa em foco.
-- **Sem aviso de troca**: trocar de perfil no mouse não mostra nada na tela; aqui aparece o nome do perfil, o DPI e o polling rate.
-- **Poucos perfis**: limitados aos perfis da memória do mouse (4 no V8S, 8 no Mercury Pro). O modo custom não tem limite.
-- **Um mouse por vez**: com dois mouses, o app aplica o perfil do programa em foco **só no mouse em uso** (conectado e acordado), sem gravar em mouse desconectado nem nos dois.
+- **Sem aviso de troca**: trocar de perfil no mouse não mostra nada na tela; aqui aparece o mouse, o nome do perfil, o DPI e o polling rate.
+- **Poucos perfis**: limitados aos perfis da memória do mouse (4 no V8S, 8 no Mercury Pro). Os perfis do app não têm limite.
+- **Um mouse por vez**: com dois mouses, o app aplica o perfil do programa em foco **só no mouse em uso**, o último mexido, clicado ou rolado (visto pelo Raw Input do Windows) entre os acordados. Nunca grava em mouse desconectado ou dormindo, nem nos dois.
 
 ### Scyrox (hub scyrox.net) — V8S
-- O hub **não oferece troca de perfil pelo botão inferior** para o V8S (a função existe no firmware, mas não aparece). O app faz isso: no modo custom alternando dois estágios de DPI, no modo nativo gravando a função nos 4 perfis.
+- O hub **não oferece troca de perfil pelo botão inferior** para o V8S (a função existe no firmware, mas não aparece). O app faz isso alternando dois estágios de DPI.
 - O percentual de bateria do app é calculado pela tensão, como o hub, em vez do valor arredondado que o mouse informa.
 
 ### Kysona (hub GearHub, qmk.top) — Mercury Pro
 - O hub **não deixa remapear o botão inferior** do Mercury Pro (só 7 botões aparecem). O app troca de perfil por ele, sem DPI Loop.
-- O **polling rate "por perfil" do hub fica salvo só no navegador**: o mouse tem um polling rate único, e trocar de perfil fora do hub mantém o valor anterior. O app guarda o polling rate de cada perfil e o reaplica a cada troca.
-- O hub **não mostra o estado dos perfis inativos**. O app lê o DPI em uso de cada um dos 8 perfis.
-- Modo custom: perfis do app gravados no perfil ativo do mouse, sem depender dos 8 perfis nativos (o perfil nativo é guardado e restaurado ao voltar).
+- O **polling rate e o sleep time "por perfil" do hub ficam só no navegador**: no mouse eles são únicos, e trocar de perfil fora do hub mantém os valores anteriores. Cada perfil do app tem os seus, gravados no mouse a cada troca.
+- O receptor **não informa de forma confiável quando o mouse dorme**. O app deduz pelo tempo sem uso (Raw Input do Windows) e pelo sleep time lido do mouse, e mostra "Offline · em sleep".
 
 ## Recursos
 
-**Modo custom** (perfis do app)
+**Perfis**
 - V8S: DPI (com X/Y separados), polling rate, LOD, sleep, cor do LED, Motion Sync, Ripple Control, Angle Snapping, Modo Competitivo e 20K FPS.
-- Kysona: DPI (com X/Y separados), polling rate e cor do LED.
+- Kysona: DPI (com X/Y separados), polling rate, sleep time e cor do LED.
 - Troca pelo botão inferior, sem cliques perdidos (cliques durante uma gravação entram em fila).
-
-**Modo nativo** (perfis guardados no mouse)
-- Lista e ativa os perfis do mouse, com as configurações lidas dele.
-- Renomeia os perfis para as notificações.
-- Opção de troca pelo botão inferior gravada no próprio firmware.
 
 **Apps**
 - Lista de programas por dispositivo, cada um com o seu perfil; ícone do programa; volta ao perfil anterior ao sair.
+
+**Dispositivos**
+- Página inicial com um card para cada mouse conectado: conexão, bateria, perfil ativo e a tag "Em uso" no mouse que está sendo usado.
 
 **Geral**
 - Bandeja do Windows, iniciar com o Windows, iniciar minimizado.
@@ -86,7 +85,7 @@ npm run dist
 ## Estrutura
 
 ```
-electron/               processo principal: janela, bandeja, notificações, monitor de foco, permissões WebHID
+electron/               processo principal: janela, bandeja, notificações, monitor de foco, uso dos mouses (Raw Input), permissões WebHID
 src/
   hid/                  protocolo e serviço WebHID do Scyrox V8S
   stores/               driver (mouse.js) e perfis (profiles.js) do V8S
@@ -94,7 +93,7 @@ src/
     registry.js         lista de dispositivos suportados
     kysona/             protocolo, serviço, driver e telas do Kysona Mercury Pro
   composables/          lógica compartilhada: regras de apps, troca por programa em foco, mouse em uso
-  components/           telas e componentes compartilhados (cards de perfil, aba Apps, seletor de modo…)
+  components/           telas e componentes compartilhados (cards de perfil e de dispositivo, aba Apps…)
 ```
 
 Para adicionar outro mouse, veja as instruções no topo de `src/devices/registry.js`.
