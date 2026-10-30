@@ -173,6 +173,9 @@ export const ONLINE_POLL_OFFLINE_MS = 1500
 export const ONLINE_POLL_ONLINE_MS = 5000
 // Sem nenhuma resposta do receptor nesse tempo, considera o mouse desligado.
 export const ONLINE_TIMEOUT_MS = 12000
+// Ao conectar o receptor, espera a primeira resposta "mouse ligado?" no máximo esse
+// tempo; sem resposta, o status passa a valer assim mesmo (mouse inativo).
+export const STATUS_READ_TIMEOUT_MS = 3000
 // "Em repouso" que chega até esse tempo após um sinal de vida do mouse é ignorado.
 export const ACTIVITY_GRACE_MS = 4000
 // Tentativas por comando quando a MCU não responde (o link sem fio pode estar acordando).

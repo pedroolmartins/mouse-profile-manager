@@ -1,17 +1,25 @@
 <script setup>
 // Criação/edição de um perfil custom do Kysona: nome, DPI (X/Y opcional), polling
-// rate e cor do LED. Só o que o app consegue gravar no perfil ativo do mouse.
+// rate, sleep time e cor do LED. Só o que o app consegue gravar no perfil ativo do mouse.
 import { ref, computed } from 'vue'
 import DpiSlider from '@/components/DpiSlider.vue'
 import ColorPicker from '@/components/ColorPicker.vue'
 import { isHexColor } from '@/utils/color.js'
-import { DPI_MIN, DPI_MAX, POLLING_RATE_OPTIONS } from './protocol.js'
+import { DPI_MIN, DPI_MAX, POLLING_RATE_OPTIONS, SLEEP_OPTIONS, sleepLabel } from './protocol.js'
 
-const props = defineProps({ initialData: { type: Object, default: null } })
+const props = defineProps({
+  initialData: { type: Object, default: null },
+  // Sleep time em uso no mouse: padrão de perfis novos e dos antigos que ainda não têm um.
+  defaultSleep: { type: Number, default: 60 },
+})
 const emit = defineEmits(['close', 'save'])
 
 const base = props.initialData ?? { name: '', dpi: 800, dpiY: 800, dpiXY: false, pollingRate: 1000, color: '#8a7fd4' }
-const form = ref({ dpiY: base.dpi, ...JSON.parse(JSON.stringify(base)) })
+const form = ref({ dpiY: base.dpi, sleepTime: props.defaultSleep, ...JSON.parse(JSON.stringify(base)) })
+// Um valor fora da lista (ex.: definido no hub) aparece como opção extra.
+const sleepOptions = computed(() =>
+  SLEEP_OPTIONS.includes(form.value.sleepTime) ? SLEEP_OPTIONS : [form.value.sleepTime, ...SLEEP_OPTIONS],
+)
 
 const canSave = computed(() => form.value.name.trim().length > 0 && isHexColor(form.value.color))
 
@@ -25,6 +33,7 @@ function save() {
     dpiY: f.dpiXY ? f.dpiY : f.dpi,
     dpiXY: f.dpiXY,
     pollingRate: f.pollingRate,
+    sleepTime: f.sleepTime,
     color: f.color,
   })
 }
@@ -58,6 +67,14 @@ function save() {
           <select v-model.number="form.pollingRate">
             <option v-for="hz in POLLING_RATE_OPTIONS" :key="hz" :value="hz">{{ hz }} Hz</option>
           </select>
+        </label>
+
+        <label class="section">
+          <span>Sleep Time</span>
+          <select v-model.number="form.sleepTime">
+            <option v-for="s in sleepOptions" :key="s" :value="s">{{ sleepLabel(s) }}</option>
+          </select>
+          <small class="hint">Tempo parado até o mouse dormir no sem fio. "Nunca" gasta mais bateria.</small>
         </label>
 
         <div class="section">
@@ -96,6 +113,7 @@ h2 { margin: 0 0 4px; font-size: 18px; font-weight: 600; color: var(--text); }
 .field-head > span,
 .sub { font-size: 14px; font-weight: 500; color: var(--muted); }
 .field-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.hint { color: var(--muted); font-size: 12px; }
 .inline-check { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; cursor: pointer; }
 .inline-check input { width: 16px; height: 16px; accent-color: var(--purple); }
 input[type='text'],

@@ -1,7 +1,7 @@
 {
   "name": "v8s",
   "productName": "Mouse Profile Manager",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Gerenciador de perfis para mouses (Scyrox V8S, Kysona Mercury Pro)",
   "author": "Mouse Profile Manager contributors",
   "license": "MIT",

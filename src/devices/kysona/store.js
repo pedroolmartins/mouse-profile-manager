@@ -20,6 +20,7 @@ import {
   buildRestoreDpi,
   parseInfo,
   parseOption0,
+  parseSleepSeconds,
   parseDpi,
   RATE_TO_CODE,
   bottomKeyAction,
@@ -51,6 +52,7 @@ export const useKysonaStore = defineStore('kysona', () => {
   const device = shallowRef(null)
   const isWired = ref(false)
   const isOnline = ref(false)
+  const isStatusKnown = ref(false)
   const battery = ref(null)
   const firmware = ref({ mouse: null, receiver: null })
   const isConnected = computed(() => !!device.value)
@@ -63,17 +65,21 @@ export const useKysonaStore = defineStore('kysona', () => {
   // `ratesVersion`: valores salvos antes da v2 vieram de testes e são descartados.
   const RATES_VERSION = 2
   const rates = ref(saved.ratesVersion === RATES_VERSION ? (saved.rates ?? {}) : {})
-  // Modo custom: perfis do app ([{ id, name, dpi, dpiY, dpiXY, pollingRate, color }]),
-  // o ativo, e a cópia do perfil nativo ativo feita ao entrar no custom (regravada ao
-  // voltar para o nativo): { index, dpiRaw (64 bytes de GET_DPI), rateCode }.
+  // Modo custom: perfis do app ([{ id, name, dpi, dpiY, dpiXY, pollingRate, sleepTime, color }],
+  // sleepTime em segundos), o ativo, e a cópia do perfil nativo ativo feita ao entrar no
+  // custom (regravada ao voltar para o nativo): { index, dpiRaw (64 bytes de GET_DPI),
+  // rateCode, sleepSeconds }.
   const mode = ref(saved.mode === 'custom' ? 'custom' : 'native')
   const customProfiles = ref(saved.customProfiles ?? [])
   const activeCustomId = ref(saved.activeCustomId ?? null)
   const nativeSnapshot = ref(saved.nativeSnapshot ?? null)
   // Apps monitorados (perfis custom): mesma lista e operações do V8S.
   const appRules = ref(saved.appRules ?? [])
+  // Sleep time do mouse (2.4G, em segundos; 0 = nunca dorme), lido da configuração geral.
+  // Guardado para valer mesmo se o app abrir com o mouse já dormindo.
+  const sleepSeconds = ref(saved.sleepSeconds ?? null)
   const appRulesApi = useAppRules(appRules, () => activeCustomId.value)
-  watch([names, profileSwitchKey, rates, mode, customProfiles, activeCustomId, nativeSnapshot, appRules], () => {
+  watch([names, profileSwitchKey, rates, mode, customProfiles, activeCustomId, nativeSnapshot, appRules, sleepSeconds], () => {
     try {
       localStorage.setItem(
         STORAGE_KEY,
@@ -87,6 +93,7 @@ export const useKysonaStore = defineStore('kysona', () => {
           activeCustomId: activeCustomId.value,
           nativeSnapshot: nativeSnapshot.value,
           appRules: appRules.value,
+          sleepSeconds: sleepSeconds.value,
         }),
       )
     } catch {
@@ -107,6 +114,35 @@ export const useKysonaStore = defineStore('kysona', () => {
   const lastExternalSwitch = ref(null)
   // Último clique do botão inferior ({ at }), como no driver do V8S: sinal de uso do mouse.
   const lastKeyEvent = ref(null)
+
+  // ---- Sleep ---------------------------------------------------------------------
+  // Dois sinais, no sem fio: o receptor, que marca o mouse como dormindo (o mesmo campo
+  // que o hub usa) mas pode demorar ou não marcar, e a dedução como a do firmware: sem
+  // nenhum uso (movimento, clique, roda, visto pelo Raw Input do Windows, ou botão
+  // inferior) pelo sleep time, o mouse está dormindo. Ao conectar, conta como usado agora.
+  const lastActivityAt = ref(null)
+  const noteActivity = () => (lastActivityAt.value = Date.now())
+  const clock = ref(Date.now())
+  let clockTimer = null
+  watch(
+    () => !!device.value && !isWired.value,
+    (wireless) => {
+      clearInterval(clockTimer)
+      clockTimer = wireless ? setInterval(() => (clock.value = Date.now()), 1000) : null
+    },
+  )
+  // Conectou, ou o receptor viu o mouse acordar: conta como uso agora.
+  watch(device, (dev) => dev && noteActivity())
+  watch(isOnline, (online) => online && noteActivity())
+  const isAsleep = computed(() => {
+    if (!device.value || isWired.value) return false
+    if (isStatusKnown.value && !isOnline.value) return true
+    return (
+      sleepSeconds.value > 0 &&
+      lastActivityAt.value !== null &&
+      clock.value - lastActivityAt.value >= sleepSeconds.value * 1000
+    )
+  })
 
   const profileName = (index) => names.value[index] || `Perfil ${index + 1}`
   // Polling rate em uso no mouse (um só para todos os perfis).
@@ -143,6 +179,7 @@ export const useKysonaStore = defineStore('kysona', () => {
         device.value = s.device ? markRaw(s.device) : null
         isWired.value = s.wired
         isOnline.value = s.online
+        isStatusKnown.value = s.statusKnown
         battery.value = s.battery
         if (!s.device) {
           activeIndex.value = null
@@ -151,6 +188,7 @@ export const useKysonaStore = defineStore('kysona', () => {
       },
       onKeyEvent: () => {
         lastKeyEvent.value = { at: Date.now() }
+        noteActivity()
         if (mode.value === 'custom') return pressedInCustom()
         setTimeout(() => pollActiveProfile().catch(() => {}), 300)
       },
@@ -165,12 +203,15 @@ export const useKysonaStore = defineStore('kysona', () => {
 
   async function dispose() {
     clearInterval(pollTimer)
+    clearInterval(clockTimer)
     await service.dispose()
   }
 
   // Configuração geral crua (resposta de GET_OPTION0): base para trocar de perfil.
   async function readOption0Raw() {
-    return service.query([CMD.GET_OPTION0])
+    const raw = await service.query([CMD.GET_OPTION0])
+    sleepSeconds.value = parseSleepSeconds(raw)
+    return raw
   }
 
   async function readOption0() {
@@ -308,7 +349,7 @@ export const useKysonaStore = defineStore('kysona', () => {
   async function pollActiveProfile() {
     // No custom o app é quem define o perfil; não há troca nativa para acompanhar.
     if (mode.value === 'custom') return
-    if (polling || busy.value || !isOnline.value || !rawProfiles.value.length) return
+    if (polling || busy.value || !isOnline.value || isAsleep.value || !rawProfiles.value.length) return
     polling = true
     try {
       const raw = await readOption0Raw()
@@ -345,7 +386,7 @@ export const useKysonaStore = defineStore('kysona', () => {
   // botão inferior com a opção. Erros ficam em lastError para a tela mostrar.
   let loading = false
   async function loadFromMouse() {
-    if (loading || !isOnline.value || keySynced) return
+    if (loading || !isOnline.value || isAsleep.value || keySynced) return
     loading = true
     try {
       if (mode.value === 'custom') {
@@ -390,7 +431,7 @@ export const useKysonaStore = defineStore('kysona', () => {
   /**
    * Grava o perfil custom `profile` no perfil nativo ativo: DPI e cor no estágio 1 e,
    * com a alternância ligada, o próximo perfil no estágio 2 (o DPI Loop do botão leva
-   * a ele e o app então aplica o próximo). Depois, o polling rate.
+   * a ele e o app então aplica o próximo). Depois, o polling rate e o sleep time.
    */
   async function applyCustom(profile, reason = 'manual') {
     startTask(`Aplicando ${profile.name}`)
@@ -400,8 +441,13 @@ export const useKysonaStore = defineStore('kysona', () => {
       const next = profileSwitchKey.value ? nextCustom(profile.id) : null
       const stages = next ? [stageOf(profile), stageOf(next)] : [stageOf(profile)]
       await service.write(buildSetDpi(nativeIndex, stages, 0))
-      const code = RATE_TO_CODE[profile.pollingRate]
-      if (code !== undefined && raw[9] !== code) await service.write(buildSetProfile(raw, nativeIndex, code))
+      // Polling rate e sleep time são um só para o mouse: gravados juntos na configuração geral.
+      const code = RATE_TO_CODE[profile.pollingRate] ?? raw[9]
+      const sleep = profile.sleepTime ?? parseSleepSeconds(raw)
+      if (raw[9] !== code || parseSleepSeconds(raw) !== sleep) {
+        await service.write(buildSetProfile(raw, nativeIndex, code, sleep))
+        sleepSeconds.value = sleep
+      }
       activeCustomId.value = profile.id
       lastCustomActivation.value = { id: profile.id, reason, at: Date.now() }
     } finally {
@@ -467,12 +513,20 @@ export const useKysonaStore = defineStore('kysona', () => {
     const raw = await readOption0Raw()
     const index = raw[8]
     const dpiRaw = await service.query([CMD.GET_DPI, index], (r) => r[0] === CMD.GET_DPI && r[1] === index)
-    nativeSnapshot.value = { index, dpiRaw: [...dpiRaw], rateCode: raw[9] }
+    nativeSnapshot.value = { index, dpiRaw: [...dpiRaw], rateCode: raw[9], sleepSeconds: parseSleepSeconds(raw) }
     if (!customProfiles.value.length) {
       // Primeiro perfil custom: o que o mouse está usando agora.
       const { stages, current } = parseDpi(dpiRaw)
       const s = stages[current] ?? stages[0] ?? { x: 800, y: 800, color: '#8a7fd4' }
-      addCustom({ name: 'Padrão', dpi: s.x, dpiY: s.y, dpiXY: s.x !== s.y, pollingRate: parseOption0(raw).pollingRate ?? 1000, color: s.color })
+      addCustom({
+        name: 'Padrão',
+        dpi: s.x,
+        dpiY: s.y,
+        dpiXY: s.x !== s.y,
+        pollingRate: parseOption0(raw).pollingRate ?? 1000,
+        sleepTime: parseSleepSeconds(raw),
+        color: s.color,
+      })
     }
     mode.value = 'custom'
     if (BOTTOM_KEY_WRITES) await syncBottomKey()
@@ -485,7 +539,7 @@ export const useKysonaStore = defineStore('kysona', () => {
     if (snap) {
       const raw = await readOption0Raw()
       // A cópia volta para o perfil de onde saiu (gravação de DPI só vale no ativo).
-      await service.write(buildSetProfile(raw, snap.index, snap.rateCode))
+      await service.write(buildSetProfile(raw, snap.index, snap.rateCode, snap.sleepSeconds))
       await service.write(buildRestoreDpi(Uint8Array.from(snap.dpiRaw)))
       nativeSnapshot.value = null
     }
@@ -516,7 +570,11 @@ export const useKysonaStore = defineStore('kysona', () => {
     isConnected,
     isWired,
     isOnline,
-    isAsleep: computed(() => false),
+    isStatusKnown,
+    isAsleep,
+    lastActivityAt,
+    noteActivity,
+    sleepSeconds,
     battery,
     firmware,
     names,

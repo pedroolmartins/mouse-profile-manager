@@ -45,6 +45,8 @@ export const useMouseStore = defineStore('mouse', () => {
   // referência reativa sem tocar no objeto em si.
   const device = shallowRef(null)
   const isOnline = ref(false)
+  // false enquanto o primeiro status do mouse ainda está sendo lido (ao abrir o app ou conectar).
+  const isStatusKnown = ref(false)
   const isInitialized = ref(false)
   const pendingCommands = ref(0)
   const lastError = ref(null)
@@ -69,6 +71,9 @@ export const useMouseStore = defineStore('mouse', () => {
   const dpiKeyPresses = ref(0)
   // Último aviso de tecla recebido, aceito ou não, para diagnóstico.
   const lastKeyEvent = shallowRef(null)
+  // Último uso do mouse visto pelo Windows (Raw Input: movimento, clique, roda).
+  const lastActivityAt = ref(null)
+  const noteActivity = () => (lastActivityAt.value = Date.now())
 
   // O que já está gravado no mouse nesta conexão, para não regravar o que não
   // mudou (cada comando pelo sem fio custa tempo). Zerado numa desconexão real.
@@ -166,6 +171,7 @@ export const useMouseStore = defineStore('mouse', () => {
         device.value = status.device ? markRaw(status.device) : null
         isWired.value = status.wired
         isOnline.value = !!status.device?.opened && status.mouseOnline
+        isStatusKnown.value = status.statusKnown
         if (!isOnline.value) {
           clearTimeout(ledTimer)
           ledLit = false
@@ -583,6 +589,7 @@ export const useMouseStore = defineStore('mouse', () => {
   return {
     device,
     isOnline,
+    isStatusKnown,
     isInitialized,
     isBusy,
     isWired,
@@ -611,6 +618,8 @@ export const useMouseStore = defineStore('mouse', () => {
     applied,
     dpiKeyPresses,
     lastKeyEvent,
+    lastActivityAt,
+    noteActivity,
     init,
     dispose,
     setUpcoming,

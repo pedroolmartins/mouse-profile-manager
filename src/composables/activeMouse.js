@@ -2,25 +2,26 @@
 // em foco) irem só para ele: nunca para um mouse desconectado ou dormindo, nem para
 // vários ao mesmo tempo.
 //
-// O app não vê os movimentos do mouse (vão para o Windows), mas cada driver sabe se o
-// mouse está acordado (`isOnline`, `isAsleep`). Entre os acordados, vale o que acordou
-// ou deu sinal de uso (ex.: botão inferior) por último.
+// Cada driver sabe se o mouse está acordado (`isOnline`, `isAsleep`). Entre os
+// acordados, vale o que acordou ou deu sinal de uso por último (movimento/clique visto
+// pelo Raw Input do Windows, botão inferior).
 import { ref, computed, watch } from 'vue'
 
 /**
- * `devices`: [{ id, driver, activity? }] — `driver` com isConnected/isOnline/isAsleep;
- * `activity()` opcional devolve algo que muda a cada sinal de uso (ex.: último clique).
+ * `devices`: [{ id, driver, activity?, isAwake? }] — `driver` com isConnected/isOnline/isAsleep;
+ * `activity`: lista opcional de funções, cada uma devolvendo algo que muda a cada sinal
+ * de uso (ex.: último clique); `isAwake()` opcional substitui a regra padrão de "acordado".
  */
 export function useActiveMouse(devices) {
   const lastActiveAt = ref({})
   const touch = (id) => (lastActiveAt.value = { ...lastActiveAt.value, [id]: Date.now() })
 
-  const awake = (d) => d.driver.isConnected && d.driver.isOnline && !d.driver.isAsleep
+  const awake = (d) => (d.isAwake ? d.isAwake() : d.driver.isConnected && d.driver.isOnline && !d.driver.isAsleep)
 
   for (const d of devices) {
     // Acordou (ou conectou já acordado): passa a ser o mais recente.
     watch(() => awake(d), (isAwake) => isAwake && touch(d.id), { immediate: true })
-    if (d.activity) watch(d.activity, (value) => value && touch(d.id))
+    for (const signal of d.activity ?? []) watch(signal, (value) => value && touch(d.id))
   }
 
   const activeId = computed(() => {

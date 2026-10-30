@@ -8,6 +8,7 @@ import {
   ONLINE_POLL_OFFLINE_MS,
   ONLINE_POLL_ONLINE_MS,
   ONLINE_TIMEOUT_MS,
+  STATUS_READ_TIMEOUT_MS,
   CMD_STATUS_CHANGED,
   CMD_DEVICE_ONLINE,
   ACTIVITY_GRACE_MS,
@@ -64,11 +65,14 @@ export class HidCommandError extends Error {
  *   wired       -> true se a interface aberta é a do cabo
  *   mouseOnline -> o mouse está ligado e respondendo. No cabo é sempre true;
  *                  no receptor depende da consulta periódica "mouse ligado?".
+ *   statusKnown -> o status já foi lido: no cabo, ao abrir; no receptor, na primeira
+ *                  resposta "mouse ligado?" (ou após STATUS_READ_TIMEOUT_MS sem resposta).
  */
 export class MouseHidService {
   device = null
   wired = false
   mouseOnline = false
+  statusKnown = false
 
   #vendorId
   #productIds
@@ -79,6 +83,7 @@ export class MouseHidService {
   #listening = false
   #reselecting = Promise.resolve()
   #pollTimer = null
+  #statusTimer = null
   #lastOnlineReplyAt = 0
   #lastActivityAt = 0 // último sinal de vida do próprio mouse (aviso ou ACK)
 
@@ -331,6 +336,7 @@ export class MouseHidService {
       current.removeEventListener('inputreport', this.#handleInputReport)
       this.#stopPolling()
       this.#rejectPending(new HidCommandError('Dispositivo desconectado', { code: 'DISCONNECTED' }))
+      clearTimeout(this.#statusTimer)
       this.device = null
       // A interface antiga pode já ter sumido do USB; fechar é só limpeza.
       if (current.opened) await current.close().catch(() => {})
@@ -344,20 +350,37 @@ export class MouseHidService {
       this.wired = target.productId === this.#productIds[0]
       if (this.wired) {
         this.mouseOnline = true
+        this.statusKnown = true
       } else {
         // No receptor, o mouse só conta como ligado depois que ele confirmar.
         this.mouseOnline = false
+        this.statusKnown = false
+        clearTimeout(this.#statusTimer)
+        this.#statusTimer = setTimeout(() => this.#markStatusKnown(), STATUS_READ_TIMEOUT_MS)
         this.#startPolling()
       }
     } else {
       this.wired = false
       this.mouseOnline = false
+      this.statusKnown = false
     }
     this.#emitStatus()
   }
 
   #emitStatus() {
-    this.#onStatusChange({ device: this.device, wired: this.wired, mouseOnline: this.mouseOnline })
+    this.#onStatusChange({
+      device: this.device,
+      wired: this.wired,
+      mouseOnline: this.mouseOnline,
+      statusKnown: this.statusKnown,
+    })
+  }
+
+  #markStatusKnown() {
+    clearTimeout(this.#statusTimer)
+    if (this.statusKnown || !this.device) return
+    this.statusKnown = true
+    this.#emitStatus()
   }
 
   // ---------------------------------------------------------------------------
@@ -402,6 +425,7 @@ export class MouseHidService {
       // (consulta enviada antes de ele acordar) ou o link ainda reconectando: ignora.
       const recentlyActive = Date.now() - this.#lastActivityAt < ACTIVITY_GRACE_MS
       if (!this.wired && (online || !recentlyActive)) this.#setMouseOnline(online)
+      this.#markStatusKnown()
       this.#onTelemetry(response) // para diagnóstico (o App registra quando muda)
       // Consulta "03" enviada pela fila (diagnóstico): entrega a resposta a ela também.
       const pending = this.#pending
@@ -419,6 +443,7 @@ export class MouseHidService {
       this.#lastActivityAt = Date.now()
       this.#lastOnlineReplyAt = Date.now()
       if (!this.wired) this.#setMouseOnline(true)
+      this.#markStatusKnown()
     }
 
     const pending = this.#pending

@@ -7,6 +7,7 @@ import { setupTray } from './tray.js'
 import { setupProfilePopup, destroyProfilePopup } from './profilePopup.js'
 import { setupProfileNotification } from './profileNotification.js'
 import { setupForegroundMonitor } from './foregroundMonitor.js'
+import { setupMouseActivity } from './mouseActivity.js'
 
 // No Windows, notificações nativas precisam de um App User Model ID para aparecer
 // com o nome do app. Precisa ser igual ao "appId" do electron-builder (package.json),
@@ -69,6 +70,7 @@ function createWindow({ show = true } = {}) {
     mainWindow = null
   })
   setupForegroundMonitor(win)
+  setupMouseActivity(win)
   setupTray(win, APP_ICON).catch((err) => console.error('[Bandeja] Falha ao criar', err))
 
   const devUrl = process.env.VITE_DEV_SERVER_URL

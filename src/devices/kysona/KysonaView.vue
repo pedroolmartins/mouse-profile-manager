@@ -7,46 +7,13 @@ import NativeProfileModal from '@/components/NativeProfileModal.vue'
 import TaskBanner from '@/components/TaskBanner.vue'
 import OptionSwitch from '@/components/OptionSwitch.vue'
 import ProfileCard from '@/components/ProfileCard.vue'
-import ProfileModeSwitch from '@/components/ProfileModeSwitch.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import KysonaProfileModal from './KysonaProfileModal.vue'
+import { SLEEP_OPTIONS, sleepLabel } from './protocol.js'
 
 const emit = defineEmits(['status', 'log', 'activated'])
 const kysona = useKysonaStore()
 const isNative = computed(() => kysona.mode === 'native')
-
-const MODES = [
-  {
-    value: 'custom',
-    label: 'Custom',
-    what: 'Perfis criados neste app. O app grava as configurações no perfil ativo do mouse a cada troca.',
-    can: ['DPI (inclusive X/Y separados), polling rate e cor do LED', 'Alternância pelo botão inferior, sem DPI Loop'],
-    note: 'Os perfis nativos do mouse ficam de lado; o ativo é restaurado ao voltar para o modo nativo.',
-  },
-  {
-    value: 'native',
-    label: 'Nativo',
-    what: 'Os 8 perfis guardados no próprio mouse, configurados no hub oficial da Kysona.',
-    can: ['Ativar qualquer um dos 8 perfis', 'Renomear os perfis para as notificações', 'Configurações lidas do mouse'],
-    note: 'Para alterar as configurações de um perfil nativo, use o hub oficial.',
-  },
-]
-
-const modeBusy = ref(false)
-async function changeMode(target) {
-  if (modeBusy.value || target === kysona.mode) return
-  modeBusy.value = true
-  try {
-    if (target === 'custom') await kysona.switchToCustom()
-    else await kysona.switchToNative()
-    emit('status', target === 'custom' ? 'Modo custom ativado.' : 'Modo nativo ativado: perfil nativo restaurado.', 'success')
-    emit('log', 'ack', `Kysona: modo ${target}`)
-  } catch (err) {
-    emit('status', `Não foi possível trocar o modo: ${err.message}`, 'error')
-  } finally {
-    modeBusy.value = false
-  }
-}
 
 // ---- Nativo -------------------------------------------------------------------------
 
@@ -135,15 +102,18 @@ const dpiText = (p) => (p.dpi == null ? '—' : p.dpiXY ? `${p.dpi} / ${p.dpiY}`
 const cardStats = (p) => [
   { label: p.dpiXY ? 'DPI X / Y' : 'DPI', value: dpiText(p) },
   { label: 'Polling Rate', value: p.pollingRate ? `${p.pollingRate}Hz` : '—' },
+  // Nativos: o sleep time é um só para o mouse (o em uso); custom: o do perfil.
+  { label: 'Sleep', value: sleepLabel(isNative.value ? kysona.sleepSeconds : (p.sleepTime ?? kysona.sleepSeconds)) },
 ]
 
 const settingsRows = (p) => [
   ['DPI em uso', dpiText(p)],
   ['Estágios de DPI', p.stages.map((s) => s.x).join(' · ')],
   ['Polling Rate', p.pollingRate ? `${p.pollingRate} Hz` : '—'],
+  ['Sleep time (do mouse)', sleepLabel(kysona.sleepSeconds)],
 ]
 
-const cardDisabled = (p) => !kysona.isOnline || modeBusy.value || (!!activatingId.value && activatingId.value !== p.id)
+const cardDisabled = (p) => !kysona.isOnline || (!!activatingId.value && activatingId.value !== p.id)
 </script>
 
 <template>
@@ -151,16 +121,9 @@ const cardDisabled = (p) => !kysona.isOnline || modeBusy.value || (!!activatingI
     <div class="section-head">
       <div class="head-left">
         <h2>Perfis</h2>
-        <ProfileModeSwitch
-          :model-value="kysona.mode"
-          :modes="MODES"
-          :disabled="!kysona.isOnline || kysona.busy || modeBusy"
-          :busy="modeBusy"
-          @change="changeMode"
-        />
       </div>
       <button v-if="!isNative" class="primary" @click="openModal()">+ Adicionar</button>
-      <button v-else class="outline" :disabled="!kysona.isOnline || kysona.busy || modeBusy" @click="reload">Recarregar</button>
+      <button v-else class="outline" :disabled="!kysona.isOnline || kysona.busy" @click="reload">Recarregar</button>
     </div>
 
     <TaskBanner v-if="kysona.task" :task="kysona.task" />
@@ -174,11 +137,11 @@ const cardDisabled = (p) => !kysona.isOnline || modeBusy.value || (!!activatingI
           ? 'Grava a troca de perfil no botão inferior dos 8 perfis. Desligada, o botão volta ao DPI Loop.'
           : 'Cada clique no botão de baixo ativa o próximo perfil da lista. Desligada, o botão não muda nada.'
       "
-      :disabled="!kysona.isOnline || kysona.busy || modeBusy"
+      :disabled="!kysona.isOnline || kysona.busy"
     />
 
     <!-- Custom: perfis do app. -->
-    <div v-if="!isNative" :class="['cards', { waiting: (kysona.busy && !activatingId) || modeBusy }]">
+    <div v-if="!isNative" :class="['cards', { waiting: kysona.busy && !activatingId }]">
       <ProfileCard
         v-for="p in kysona.customProfiles"
         :key="p.id"
@@ -197,7 +160,7 @@ const cardDisabled = (p) => !kysona.isOnline || modeBusy.value || (!!activatingI
     <!-- Nativo: os 8 perfis do mouse. -->
     <template v-else>
       <p class="hint">Perfis guardados no mouse. Clique para ativar; as configurações são alteradas no hub oficial.</p>
-      <div v-if="kysona.profiles.length" :class="['cards', { waiting: (kysona.busy && !activatingId) || modeBusy }]">
+      <div v-if="kysona.profiles.length" :class="['cards', { waiting: kysona.busy && !activatingId }]">
         <ProfileCard
           v-for="p in kysona.profiles"
           :key="p.id"
@@ -222,7 +185,13 @@ const cardDisabled = (p) => !kysona.isOnline || modeBusy.value || (!!activatingI
       </p>
     </template>
 
-    <KysonaProfileModal v-if="showModal" :initial-data="editingCustom" @close="showModal = false" @save="saveCustom" />
+    <KysonaProfileModal
+      v-if="showModal"
+      :initial-data="editingCustom"
+      :default-sleep="SLEEP_OPTIONS.includes(kysona.sleepSeconds) ? kysona.sleepSeconds : 60"
+      @close="showModal = false"
+      @save="saveCustom"
+    />
 
     <NativeProfileModal
       v-if="editingNative"

@@ -13,11 +13,10 @@ import SettingsModal from '@/components/SettingsModal.vue'
 import AppsTab from '@/components/AppsTab.vue'
 import DeviceHome from '@/components/DeviceHome.vue'
 import BatteryIndicator from '@/components/BatteryIndicator.vue'
-import ProfileModeSwitch from '@/components/ProfileModeSwitch.vue'
 import NativeProfileModal from '@/components/NativeProfileModal.vue'
 import TaskBanner from '@/components/TaskBanner.vue'
 import OptionSwitch from '@/components/OptionSwitch.vue'
-import { findDevice } from '@/devices/registry.js'
+import { DEVICES, findDevice } from '@/devices/registry.js'
 import KysonaView from '@/devices/kysona/KysonaView.vue'
 import { useKysonaStore } from '@/devices/kysona/store.js'
 
@@ -94,11 +93,14 @@ function addLog(kind, text) {
 
 // Aviso escolhido nas configurações (só no Electron), exibido depois que todas as
 // configurações foram gravadas; útil com o app minimizado ou em segundo plano.
-function notifyActivated({ name, dpi, pollingRate, color }) {
+// `deviceId` identifica o mouse em que o perfil foi trocado (nome mostrado no aviso).
+function notifyActivated({ name, dpi, pollingRate, color }, deviceId = 'scyrox-v8s') {
   const { enabled, type } = profilesStore.notifications
   if (!enabled) return
-  if (type === 'native') window.profileNotification?.show({ name, dpi, pollingRate })
-  else window.profilePopup?.show({ name, dpi, pollingRate, color })
+  const found = findDevice(deviceId)
+  const device = found ? `${found.brand} ${found.model}` : ''
+  if (type === 'native') window.profileNotification?.show({ name, dpi, pollingRate, device })
+  else window.profilePopup?.show({ name, dpi, pollingRate, color, device })
 }
 
 // Ativações automáticas que chegam com o mouse em repouso (receptor sem fio diz que
@@ -194,6 +196,37 @@ async function changeProfileMode(target) {
     modeBusy.value = false
   }
 }
+
+// Só o modo custom fica disponível (a alternância de modos não aparece na tela). Dados
+// antigos ainda no modo nativo voltam sozinhos para o custom assim que o mouse responde.
+// Uma tentativa por conexão: se falhar, não fica repetindo (o erro aparece no aviso).
+let v8sToCustomTried = false
+watch(() => mouse.isConnected, (connected) => !connected && (v8sToCustomTried = false))
+watch(
+  () => isNative.value && mouse.isOnline && !modeBusy.value && !applyingId.value,
+  (ready) => {
+    if (!ready || v8sToCustomTried) return
+    v8sToCustomTried = true
+    changeProfileMode('custom')
+  },
+  { immediate: true },
+)
+let kysonaToCustomTried = false
+watch(() => kysona.isConnected, (connected) => !connected && (kysonaToCustomTried = false))
+watch(
+  () => kysona.mode === 'native' && kysona.isOnline && !kysona.isAsleep && !kysona.busy,
+  async (ready) => {
+    if (!ready || kysonaToCustomTried) return
+    kysonaToCustomTried = true
+    try {
+      await kysona.switchToCustom()
+      addLog('ack', 'Kysona: modo custom')
+    } catch (err) {
+      setStatus(`Kysona: não foi possível voltar ao modo custom: ${err.message}`, 'error')
+    }
+  },
+  { immediate: true },
+)
 
 async function reloadNative() {
   modeBusy.value = true
@@ -322,10 +355,29 @@ const focusedApp = ref('')
 
 // Só o mouse em uso recebe o perfil do programa em foco (nunca um desconectado ou
 // dormindo, nem dois ao mesmo tempo).
+// V8S: o receptor diz "não responde" já em poucos segundos parado (repouso), então ele
+// segue acordado até o sleep inferido; sem isso, num repouso curto o outro mouse virava
+// o mouse em uso e recebia as trocas.
 const activeMouse = useActiveMouse([
-  { id: 'scyrox-v8s', driver: mouse, activity: () => mouse.lastKeyEvent },
-  { id: 'kysona-mercury-pro', driver: kysona, activity: () => kysona.lastKeyEvent },
+  {
+    id: 'scyrox-v8s',
+    driver: mouse,
+    isAwake: () => mouse.isConnected && !mouse.isAsleep,
+    activity: [
+      () => mouse.lastActivityAt,
+      () => (mouse.isOnline ? { key: mouse.lastKeyEvent } : null),
+    ],
+  },
+  { id: 'kysona-mercury-pro', driver: kysona, activity: [() => kysona.lastActivityAt, () => kysona.lastKeyEvent] },
 ])
+
+// Uso de cada mouse (movimento, clique, roda) visto pelo Raw Input do Windows: decide
+// qual está em uso e, no Kysona, quando ele dormiu.
+let stopActivityListener = null
+function handleMouseActivity({ vendorId, productId }) {
+  const device = DEVICES.find((d) => d.vendorId === vendorId && d.productIds.includes(productId))
+  device?.useDriver().noteActivity?.()
+}
 
 // V8S: só perfis custom (no modo nativo fica parado).
 const v8sFocus = useFocusProfileSwitching({
@@ -380,7 +432,7 @@ watch(
     const message = ACTIVATION_MESSAGES[event.reason]
     if (!message) return // edição ou liga/desliga da alternância: sem aviso
     setStatus(`Perfil "${profile.name}" ${message}!`, 'success')
-    notifyActivated(profile)
+    notifyActivated(profile, 'kysona-mercury-pro')
   },
 )
 // Troca feita no próprio mouse no modo nativo (botão inferior ou hub).
@@ -391,7 +443,7 @@ watch(
     if (!profile) return
     setStatus(`Perfil "${profile.name}" ${ACTIVATION_MESSAGES.button}!`, 'success')
     addLog('ack', `Kysona: perfil ${profile.index + 1} ativado no mouse`)
-    notifyActivated(profile)
+    notifyActivated(profile, 'kysona-mercury-pro')
   },
 )
 watch(
@@ -564,6 +616,7 @@ onMounted(async () => {
   await profilesStore.load()
   if (window.foregroundApp) {
     stopFocusListener = window.foregroundApp.onChange(handleFocusChange)
+    stopActivityListener = window.mouseActivity?.onActivity(handleMouseActivity)
     focusedApp.value = (await window.foregroundApp.current()).name
   }
   // Cada driver inicia por conta própria: um dispositivo travado não segura o outro.
@@ -578,6 +631,7 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => {
   stopFocusListener?.()
+  stopActivityListener?.()
   mouse.dispose()
   kysona.dispose()
 })
@@ -619,7 +673,7 @@ onBeforeUnmount(() => {
       </button>
     </header>
 
-    <DeviceHome v-if="view === 'home'" @open="openDeviceView" />
+    <DeviceHome v-if="view === 'home'" :active-id="activeMouse.activeId.value" @open="openDeviceView" />
 
     <template v-else>
     <nav class="tabs" role="tablist">
@@ -647,19 +701,13 @@ onBeforeUnmount(() => {
         role="tabpanel"
         @status="setStatus"
         @log="addLog"
-        @activated="notifyActivated"
+        @activated="notifyActivated($event, 'kysona-mercury-pro')"
       />
 
       <section v-else v-show="tab === 'profiles'" role="tabpanel" :class="{ 'native-mode': isNative }">
       <div class="section-head">
         <div class="head-left">
           <h2>Perfis</h2>
-          <ProfileModeSwitch
-            :model-value="profilesStore.profileMode"
-            :disabled="!mouse.isConnected || modeBusy || !!applyingId"
-            :busy="modeBusy"
-            @change="changeProfileMode"
-          />
         </div>
         <button v-if="!isNative" class="primary" @click="openModal()">+ Adicionar</button>
         <button v-else class="outline" :disabled="!mouse.isConnected || modeBusy || !!applyingId" @click="reloadNative">

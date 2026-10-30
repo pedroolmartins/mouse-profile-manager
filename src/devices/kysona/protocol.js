@@ -23,6 +23,11 @@ export const PROFILE_COUNT = 8
 export const DPI_MIN = 50
 export const DPI_MAX = 26000 // PAW3395
 export const POLLING_RATE_OPTIONS = [125, 250, 500, 1000, 2000, 4000, 8000]
+// Sleep time do 2.4G em segundos (0 = nunca dorme). O mouse aceita 0..65535; estes são
+// os oferecidos na tela.
+export const SLEEP_OPTIONS = [10, 30, 60, 120, 300, 600, 1800, 0]
+export const sleepLabel = (seconds) =>
+  seconds == null ? '—' : seconds === 0 ? 'Nunca' : seconds < 60 ? `${seconds} s` : `${+(seconds / 60).toFixed(1)} min`
 export const BOTTOM_KEY_INDEX = 5
 export const KEY_DPI_LOOP = [20, 0, 0, 0]
 export const KEY_PROFILE_LOOP = [8, 0, 3, 0]
@@ -59,13 +64,18 @@ export function encodeCommand(bytes) {
 
 /**
  * `option0`: resposta de GET_OPTION0 (64 bytes); `rateCode`: código do polling rate
- * que o mouse passa a usar (byte 9; único para o mouse inteiro).
+ * que o mouse passa a usar (byte 9; único para o mouse inteiro). `sleepSeconds`
+ * (opcional): sleep time do 2.4G (bytes 44-45, também único); sem ele, fica o atual.
  */
-export function buildSetProfile(option0, index, rateCode) {
+export function buildSetProfile(option0, index, rateCode, sleepSeconds) {
   const packet = new Uint8Array(option0)
   packet[0] = CMD.SET_OPTION0
   packet[8] = index
   packet[9] = rateCode
+  if (sleepSeconds != null) {
+    packet[44] = sleepSeconds & 255
+    packet[45] = (sleepSeconds >> 8) & 255
+  }
   // Valores fixos que o hub sempre grava nesses bytes.
   packet[17] = 255
   packet[18] = 8
@@ -113,8 +123,12 @@ export function parseInfo(r) {
 }
 
 export function parseOption0(r) {
-  return { profile: r[8], pollingRate: POLLING_RATES[r[9]] ?? null }
+  return { profile: r[8], pollingRate: POLLING_RATES[r[9]] ?? null, sleepSeconds: parseSleepSeconds(r) }
 }
+
+// Sleep time do 2.4G em segundos (0 = desligado), nos bytes 44-45 da configuração geral,
+// como no hub oficial. Testado: mudar no hub para 10 s levou os bytes de "00 ff" para "0a 00".
+export const parseSleepSeconds = (r) => r[44] | (r[45] << 8)
 
 const hex = (r, g, b) => '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')
 

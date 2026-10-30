@@ -2,6 +2,28 @@
 
 Os instaladores de cada versão ficam em `release/<versão>/` (as versões anteriores são mantidas).
 
+## 0.2.2 — 2026-10-30
+
+### Novo
+- **Mouse em uso pelo Windows (Raw Input)**: o app vê qual mouse está sendo mexido, clicado ou rolado. A troca de perfil por programa em foco vai sempre para o mouse que você está usando, e o card dele na página inicial ganha a tag **"Em uso"**.
+- **Sleep do Kysona**: o card e o cabeçalho mostram "Offline · em sleep" quando o mouse dorme (pelo tempo sem uso e pelo aviso do receptor). Dormindo, o app para de consultar o mouse.
+- **Sleep time nos perfis custom do Kysona** (10 s a 30 min, ou nunca), gravado no mouse ao ativar o perfil. O sleep time em uso é lido do mouse.
+- Notificações de troca de perfil mostram o **nome do mouse** (popup junto ao ponteiro e notificação do Windows).
+- Ao abrir o app ou reconectar um mouse, o card fica cinza, sem clique, com **"Lendo status..."** até o status do mouse chegar.
+
+### Alterações
+- **Modo nativo desabilitado** nos dois mouses: a alternância Custom/Nativo saiu da tela e o app usa só o modo custom. O modo nativo se mostrou muito instável, principalmente no Kysona, e com o modo padrão do app (custom) acaba sendo desnecessário. Quem estava no modo nativo volta sozinho para o custom assim que o mouse responde.
+- A página inicial mostra só os mouses conectados ao computador (cabo ou receptor); sem nenhum, mostra um aviso.
+
+### Correções
+- O Kysona recebia as trocas por programa em foco enquanto o Scyrox estava em uso: num repouso curto do Scyrox, o app passava a considerar o Kysona o mouse em uso.
+
+## 0.2.1 — 2026-10-29
+
+### Correções
+- Monitor do programa em foco sem PowerShell: um console oculto podia piscar e roubar o foco do jogo, e o processo separado podia travar. Agora a API do Windows é chamada direto pelo app.
+- Troca de perfil por programa em foco atrasava com o app escondido na bandeja (o Chromium segurava os timers da janela oculta).
+
 ## 0.2.0 — 2026-10-26
 
 ### Novo

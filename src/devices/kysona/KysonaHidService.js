@@ -37,6 +37,7 @@ export class KysonaHidService {
   wired = false
   online = false
   battery = null
+  statusKnown = false // false até a primeira leitura do status (no cabo, já ao abrir)
 
   #eventDevice = null
   #queue = Promise.resolve()
@@ -98,6 +99,7 @@ export class KysonaHidService {
     this.device = target
     this.wired = KYSONA_WIRED_PIDS.includes(target.productId)
     this.online = this.wired
+    this.statusKnown = this.wired
     // No cabo o mouse não informa nível nem carga (testado: nenhum comando ou aviso traz
     // isso); por escolha do usuário, cabo conectado conta como carregando.
     this.battery = this.wired ? { cable: true, charging: true } : null
@@ -125,6 +127,7 @@ export class KysonaHidService {
     this.device = null
     this.online = false
     this.battery = null
+    this.statusKnown = false
   }
 
   #handleInput = (event) => {
@@ -133,13 +136,28 @@ export class KysonaHidService {
   }
 
   #emit() {
-    this.#onStatusChange({ device: this.device, wired: this.wired, online: this.online, battery: this.battery })
+    this.#onStatusChange({
+      device: this.device,
+      wired: this.wired,
+      online: this.online,
+      battery: this.battery,
+      statusKnown: this.statusKnown,
+    })
   }
 
   #startPolling() {
     clearInterval(this.#pollTimer)
     if (this.wired) return
-    const poll = () => this.#run(() => this.#readDongleStatus()).catch(() => {})
+    const device = this.device
+    // A primeira leitura (com ou sem resposta do mouse) define o status.
+    const poll = () =>
+      this.#run(() => this.#readDongleStatus())
+        .catch(() => {})
+        .finally(() => {
+          if (this.statusKnown || this.device !== device) return
+          this.statusKnown = true
+          this.#emit()
+        })
     poll()
     this.#pollTimer = setInterval(poll, STATUS_POLL_MS)
   }

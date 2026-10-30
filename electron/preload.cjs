@@ -31,10 +31,21 @@ contextBridge.exposeInMainWorld('foregroundApp', {
   getIcon: (exePath) => ipcRenderer.invoke('apps:icon', exePath),
 })
 
+contextBridge.exposeInMainWorld('mouseActivity', {
+  // Uso de um mouse (movimento, clique, roda), no máximo 1 aviso por segundo por mouse:
+  // { vendorId, productId }. Devolve a função que para de ouvir.
+  onActivity: (callback) => {
+    const listener = (_event, ids) => callback(ids)
+    ipcRenderer.on('mouse:activity', listener)
+    return () => ipcRenderer.removeListener('mouse:activity', listener)
+  },
+})
+
 contextBridge.exposeInMainWorld('profileNotification', {
-  show: ({ name, dpi, pollingRate }) => ipcRenderer.send('notify:profile', { name, dpi, pollingRate }),
+  show: ({ name, dpi, pollingRate, device }) => ipcRenderer.send('notify:profile', { name, dpi, pollingRate, device }),
 })
 
 contextBridge.exposeInMainWorld('profilePopup', {
-  show: ({ name, dpi, pollingRate, color }) => ipcRenderer.send('popup:profile', { name, dpi, pollingRate, color }),
+  show: ({ name, dpi, pollingRate, color, device }) =>
+    ipcRenderer.send('popup:profile', { name, dpi, pollingRate, color, device }),
 })

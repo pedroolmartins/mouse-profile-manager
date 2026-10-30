@@ -7,7 +7,7 @@ import path from 'node:path'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const WIDTH = 240
-const HEIGHT = 76
+const HEIGHT = 92
 const CURSOR_OFFSET = 18 // distância do ponteiro, para não ficar embaixo dele
 const VISIBLE_MS = 1600
 
@@ -51,7 +51,7 @@ function positionNearCursor() {
   popup.setBounds({ x: Math.round(x), y: Math.round(y), width: WIDTH, height: HEIGHT })
 }
 
-async function showProfile({ name, dpi, pollingRate, color }) {
+async function showProfile({ name, dpi, pollingRate, color, device }) {
   if (!popup) createPopup()
   await ready
   positionNearCursor()
@@ -61,6 +61,7 @@ async function showProfile({ name, dpi, pollingRate, color }) {
     dpi: Number(dpi),
     pollingRate: Number(pollingRate),
     color: String(color),
+    device: device ? String(device) : '',
   })
   await popup.webContents.executeJavaScript(`window.render(${data})`)
   popup.showInactive()

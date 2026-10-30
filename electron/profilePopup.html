@@ -31,6 +31,15 @@
       .card.visible { opacity: 1; }
       .led { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--c, #8a7fd4); }
       .text { min-width: 0; }
+      .device {
+        overflow: hidden;
+        margin-bottom: 1px;
+        font-size: 11px;
+        color: #8b9099;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+      .device:empty { display: none; }
       .name {
         overflow: hidden;
         font-size: 14px;
@@ -47,6 +56,7 @@
     <div class="card" id="card">
       <span class="led"></span>
       <div class="text">
+        <div class="device" id="device"></div>
         <div class="name" id="name"></div>
         <div class="dpi"><b id="dpi"></b> DPI <span class="sep">·</span> <b class="rate" id="rate"></b> Hz</div>
       </div>
@@ -54,8 +64,9 @@
     <script>
       const card = document.getElementById('card')
       // Chamado pelo processo principal a cada ativação.
-      window.render = ({ name, dpi, pollingRate, color }) => {
+      window.render = ({ name, dpi, pollingRate, color, device }) => {
         card.style.setProperty('--c', color)
+        document.getElementById('device').textContent = device
         document.getElementById('name').textContent = name
         document.getElementById('dpi').textContent = dpi.toLocaleString('pt-BR')
         document.getElementById('rate').textContent = pollingRate.toLocaleString('pt-BR')

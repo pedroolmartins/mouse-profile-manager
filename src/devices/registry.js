@@ -7,6 +7,8 @@
 //        isOnline     -> o aparelho está respondendo
 //        isWired      -> conectado por cabo
 //        battery      -> { level (%), charging, updatedAt } ou null (sem bateria / ainda não lido)
+//        isStatusKnown -> (opcional) false enquanto o primeiro status é lido após conectar
+//        noteActivity -> (opcional) chamado a cada uso do mouse visto pelo Raw Input do Windows
 //        isAsleep     -> (opcional) o aparelho está dormindo/offline mesmo com o receptor conectado
 //        firmware     -> (opcional) { mouse, receiver } com as versões ("v5.06") ou null
 //   2. Libere os IDs USB dele em electron/hidPermissions.js.
