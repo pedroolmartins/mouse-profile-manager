@@ -65,7 +65,8 @@ export const useProfilesStore = defineStore('profiles', () => {
     if (data?.version === STORAGE_VERSION && data.profiles?.length) {
       // Perfis salvos por versões anteriores ganham os campos novos com o valor padrão.
       profiles.value = data.profiles.map((p) => ({ ...DEFAULT_SETTINGS, ...p }))
-      activeProfileId.value = data.activeProfileId ?? data.profiles[0].id
+      // O app sempre abre no primeiro perfil (não no último usado); a conexão do mouse o aplica.
+      activeProfileId.value = profiles.value[0].id
       profileSwitchKey.value = !!data.settings?.profileSwitchKey
       notifications.value = { ...DEFAULT_NOTIFICATIONS, ...data.settings?.notifications }
       showLog.value = !!data.settings?.showLog

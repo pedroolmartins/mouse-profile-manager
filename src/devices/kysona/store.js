@@ -71,7 +71,8 @@ export const useKysonaStore = defineStore('kysona', () => {
   // rateCode, sleepSeconds }.
   const mode = ref(saved.mode === 'custom' ? 'custom' : 'native')
   const customProfiles = ref(saved.customProfiles ?? [])
-  const activeCustomId = ref(saved.activeCustomId ?? null)
+  // O app sempre abre no primeiro perfil custom (não no último usado); a conexão o aplica.
+  const activeCustomId = ref(saved.customProfiles?.[0]?.id ?? null)
   const nativeSnapshot = ref(saved.nativeSnapshot ?? null)
   // Apps monitorados (perfis custom): mesma lista e operações do V8S.
   const appRules = ref(saved.appRules ?? [])
