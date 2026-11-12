@@ -2,6 +2,18 @@
 
 Os instaladores de cada versão ficam em `release/<versão>/` (as versões anteriores são mantidas).
 
+## 0.3.0 — 2026-11-12
+
+### Novo
+- **Versão para Linux (Ubuntu e derivados)**: pacote `.deb` e AppImage.
+  - O `.deb` instala a regra udev que dá ao usuário logado acesso aos mouses, e o `x11-utils`.
+  - Troca de perfil por programa em foco pelo X11, o que inclui os jogos pelo Steam/Proton/Wine numa sessão Wayland. Os jogos do Windows aparecem com o mesmo nome (`jogo.exe`), então as regras da aba Apps valem nos dois sistemas.
+  - Mouse em uso e sleep do Kysona pelos eventos de entrada do mouse (`/dev/input`), no lugar do Raw Input do Windows. A regra udev libera só as interfaces de mouse dos aparelhos suportados.
+  - Iniciar com o sistema pelo autostart (`~/.config/autostart`).
+
+### Alterações
+- Ao abrir, o app aplica sempre o **primeiro perfil** de cada mouse (no lugar do último usado).
+
 ## 0.2.2 — 2026-10-30
 
 ### Novo

@@ -4,7 +4,10 @@
 // não informa quando o mouse dorme; com isto o app sabe quem está em uso de verdade.
 // Recebe os eventos na própria janela do app (WM_INPUT, mesmo oculta na bandeja) e
 // avisa o renderer no máximo uma vez por NOTIFY_MS por mouse: { vendorId, productId }.
+// No Linux, ver mouseActivityLinux.js.
 import { createRequire } from 'node:module'
+import { isSupported } from './hidPermissions.js'
+import { startLinuxMouseActivity, stopLinuxMouseActivity } from './mouseActivityLinux.js'
 
 const WM_INPUT = 0x00ff
 const RIDEV_INPUTSINK = 0x100 // recebe os eventos mesmo sem a janela em foco
@@ -39,6 +42,11 @@ function deviceIds(handle) {
 }
 
 export function setupMouseActivity(win) {
+  if (process.platform === 'linux') {
+    startLinuxMouseActivity(isSupported, (ids) => !win.isDestroyed() && win.webContents.send('mouse:activity', ids))
+    win.on('closed', stopLinuxMouseActivity)
+    return
+  }
   if (process.platform !== 'win32') return
   try {
     win32 ??= loadWin32()

@@ -1,11 +1,13 @@
-// Monitora qual programa está em primeiro plano no Windows e avisa a janela do app
-// quando ele muda. Consulta a API do Windows (GetForegroundWindow) direto do processo
+// Monitora qual programa está em primeiro plano e avisa a janela do app quando ele
+// muda. No Windows, consulta a API do Windows (GetForegroundWindow) direto do processo
 // principal, via koffi (FFI com binários prontos), a cada POLL_MS. Não cria nenhum
 // processo filho: um console (PowerShell, cmd) poderia piscar na tela e roubar o foco
 // do jogo, e um processo separado pode travar e atrasar a troca de perfil.
+// No Linux, ver foregroundLinux.js.
 import { createRequire } from 'node:module'
 import { app, ipcMain, dialog, BrowserWindow } from 'electron'
 import path from 'node:path'
+import { startLinuxForeground, stopLinuxForeground } from './foregroundLinux.js'
 
 const POLL_MS = 250
 const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
@@ -61,12 +63,17 @@ function poll(win) {
   }
   // O app compara nomes em minúsculas e sem extensão (ex.: "b1-win64-shipping").
   const name = exePath ? path.basename(exePath).replace(/\.exe$/i, '').toLowerCase() : ''
-  if (name === current.name) return
-  current = { name, path: exePath }
+  report(win, { name, path: exePath })
+}
+
+function report(win, program) {
+  if (program.name === current.name) return
+  current = program
   if (!win.isDestroyed()) win.webContents.send('foreground:changed', current)
 }
 
 function start(win) {
+  if (process.platform === 'linux') return startLinuxForeground((program) => report(win, program))
   if (process.platform !== 'win32' || timer) return
   try {
     win32 ??= loadWin32()
@@ -81,6 +88,7 @@ function start(win) {
 export function stopForegroundMonitor() {
   clearInterval(timer)
   timer = null
+  if (process.platform === 'linux') stopLinuxForeground()
 }
 
 let handlersRegistered = false
@@ -96,7 +104,8 @@ export function setupForegroundMonitor(win) {
     const result = await dialog.showOpenDialog(BrowserWindow.getFocusedWindow() ?? undefined, {
       title: 'Escolher o programa',
       properties: ['openFile'],
-      filters: [{ name: 'Programas', extensions: ['exe'] }],
+      // No Linux, programas não têm extensão (e jogos do Wine/Proton são .exe).
+      filters: process.platform === 'win32' ? [{ name: 'Programas', extensions: ['exe'] }] : [],
     })
     if (result.canceled) return null
     const file = result.filePaths[0]

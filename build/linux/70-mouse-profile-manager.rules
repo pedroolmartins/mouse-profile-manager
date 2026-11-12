@@ -1,0 +1,14 @@
+# Mouse Profile Manager: acesso do usuário logado aos mouses suportados (WebHID/hidraw).
+# Scyrox V8S (cabo e receptor)
+KERNEL=="hidraw*", ATTRS{idVendor}=="3554", ATTRS{idProduct}=="f515", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="3554", ATTRS{idProduct}=="f517", TAG+="uaccess"
+# Kysona Mercury Pro (cabo e receptor 2.4G)
+KERNEL=="hidraw*", ATTRS{idVendor}=="3151", ATTRS{idProduct}=="4026", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="3151", ATTRS{idProduct}=="402d", TAG+="uaccess"
+
+# Uso dos mouses (detecção de sleep e "mouse em uso"): leitura dos eventos só das
+# interfaces de mouse (ID_INPUT_MOUSE, definido antes pela regra 60-input-id).
+SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_MOUSE}=="1", ATTRS{idVendor}=="3554", ATTRS{idProduct}=="f515", TAG+="uaccess"
+SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_MOUSE}=="1", ATTRS{idVendor}=="3554", ATTRS{idProduct}=="f517", TAG+="uaccess"
+SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_MOUSE}=="1", ATTRS{idVendor}=="3151", ATTRS{idProduct}=="4026", TAG+="uaccess"
+SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_MOUSE}=="1", ATTRS{idVendor}=="3151", ATTRS{idProduct}=="402d", TAG+="uaccess"

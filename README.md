@@ -1,6 +1,6 @@
 # Mouse Profile Manager
 
-App de desktop para Windows que gerencia perfis de mouses gamer direto pelo USB, sem depender do hub oficial aberto no navegador. Troca de perfil pelo botão do mouse, pelo programa em foco ou pelo app, com aviso na tela a cada troca.
+App de desktop para Windows e Linux (Ubuntu) que gerencia perfis de mouses gamer direto pelo USB, sem depender do hub oficial aberto no navegador. Troca de perfil pelo botão do mouse, pelo programa em foco ou pelo app, com aviso na tela a cada troca.
 
 Mouses suportados:
 
@@ -56,20 +56,46 @@ Os dois mouses guardam poucos perfis na memória e são configurados por hubs qu
 - Página inicial com um card para cada mouse conectado: conexão, bateria, perfil ativo e a tag "Em uso" no mouse que está sendo usado.
 
 **Geral**
-- Bandeja do Windows, iniciar com o Windows, iniciar minimizado.
+- Bandeja do sistema, iniciar com o sistema (Windows ou Linux), iniciar minimizado.
 - Faixa de progresso durante comandos longos; log de comunicação (opcional, para diagnóstico).
 
 ## Instalação
 
-Baixe o instalador da versão mais recente em **[Releases](../../releases)** e execute `Mouse Profile Manager Setup <versão>.exe`.
+Baixe a versão mais recente em **[Releases](../../releases)**.
 
-O instalador não é assinado digitalmente; o Windows pode mostrar o aviso de "editor desconhecido".
+### Windows
+
+Execute `Mouse Profile Manager Setup <versão>.exe`. O instalador não é assinado digitalmente; o Windows pode mostrar o aviso de "editor desconhecido".
+
+### Linux (Ubuntu e derivados)
+
+**Pacote .deb (recomendado)**:
+
+```bash
+sudo apt install ./Mouse-Profile-Manager-<versão>-amd64.deb
+```
+
+O pacote instala também a regra udev que dá ao usuário logado acesso aos mouses (sem ela, o app não consegue falar com eles) e o `x11-utils` (usado pelo monitor do programa em foco). Para remover: `sudo apt remove mouse-profile-manager`.
+
+**AppImage**: torne o arquivo executável e instale a regra udev uma vez (`70-mouse-profile-manager.rules`, anexada à mesma release):
+
+```bash
+chmod +x Mouse-Profile-Manager-<versão>-x86_64.AppImage
+sudo cp 70-mouse-profile-manager.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+O AppImage precisa do `xprop` (pacote `x11-utils`) para a troca por programa em foco.
+
+**Limitações no Linux**:
+- **Troca por programa em foco**: funciona com janelas X11, o que inclui os jogos pelo Steam/Proton/Wine também numa sessão Wayland (eles rodam pelo XWayland). Os nomes dos jogos do Windows são os mesmos (`jogo.exe`), então as regras da aba Apps valem nos dois sistemas. Programas nativos do Wayland em foco não são vistos.
+- O popup junto ao ponteiro pode não acompanhar o ponteiro numa sessão Wayland; a notificação do sistema funciona em qualquer sessão.
 
 **Não deixe o hub oficial aberto junto com o app**: os dois falam com o mesmo receptor e um atrapalha as respostas do outro.
 
 ## Rodar a partir do código
 
-Requisitos: Windows, [Node.js](https://nodejs.org/) 20 ou mais novo.
+Requisitos: Windows ou Linux, [Node.js](https://nodejs.org/) 20 ou mais novo.
 
 ```bash
 npm install
@@ -79,13 +105,22 @@ npm run dev
 Gerar o instalador (sai em `release/<versão>/`):
 
 ```bash
-npm run dist
+npm run dist          # Windows (NSIS)
+npm run dist:linux    # Linux (AppImage e .deb), num Linux ou no Docker
+```
+
+No Windows, os pacotes Linux saem pelo Docker (imagem `electronuserland/builder`):
+
+```bash
+npx vite build
+docker run --rm -v "$PWD:/project" -w /project electronuserland/builder:20 node node_modules/electron-builder/cli.js --linux --x64 --config.npmRebuild=false
 ```
 
 ## Estrutura
 
 ```
-electron/               processo principal: janela, bandeja, notificações, monitor de foco, uso dos mouses (Raw Input), permissões WebHID
+electron/               processo principal: janela, bandeja, notificações, monitor de foco, uso dos mouses (Raw Input; /dev/input no Linux), permissões WebHID
+build/linux/            regra udev e scripts do pacote .deb
 src/
   hid/                  protocolo e serviço WebHID do Scyrox V8S
   stores/               driver (mouse.js) e perfis (profiles.js) do V8S

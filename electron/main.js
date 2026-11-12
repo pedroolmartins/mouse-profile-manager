@@ -8,6 +8,7 @@ import { setupProfilePopup, destroyProfilePopup } from './profilePopup.js'
 import { setupProfileNotification } from './profileNotification.js'
 import { setupForegroundMonitor } from './foregroundMonitor.js'
 import { setupMouseActivity } from './mouseActivity.js'
+import { getLinuxAutostart, setLinuxAutostart } from './startupLinux.js'
 
 // No Windows, notificações nativas precisam de um App User Model ID para aparecer
 // com o nome do app. Precisa ser igual ao "appId" do electron-builder (package.json),
@@ -97,14 +98,17 @@ function setupOfficialHubLink() {
 }
 
 function setupStartupSetting() {
-  ipcMain.handle('startup:get', () => ({
+  const isLinux = process.platform === 'linux'
+  const isEnabled = () => (isLinux ? getLinuxAutostart() : app.getLoginItemSettings(loginItem).openAtLogin)
+  ipcMain.handle('startup:get', async () => ({
     supported: app.isPackaged,
-    enabled: app.isPackaged && app.getLoginItemSettings(loginItem).openAtLogin,
+    enabled: app.isPackaged && (await isEnabled()),
   }))
-  ipcMain.handle('startup:set', (_event, enabled) => {
+  ipcMain.handle('startup:set', async (_event, enabled) => {
     if (!app.isPackaged) return false
+    if (isLinux) return setLinuxAutostart(!!enabled, loginItem.args)
     app.setLoginItemSettings({ ...loginItem, openAtLogin: !!enabled })
-    return app.getLoginItemSettings(loginItem).openAtLogin
+    return isEnabled()
   })
 }
 

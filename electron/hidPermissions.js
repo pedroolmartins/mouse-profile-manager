@@ -8,7 +8,7 @@ const SUPPORTED = [
   { vendorId: VENDOR_ID, productIds: PRODUCT_IDS },
   { vendorId: KYSONA_VENDOR_ID, productIds: KYSONA_PRODUCT_IDS },
 ]
-const isSupported = (d) => SUPPORTED.some((s) => d.vendorId === s.vendorId && s.productIds.includes(d.productId))
+export const isSupported = (d) => SUPPORTED.some((s) => d.vendorId === s.vendorId && s.productIds.includes(d.productId))
 
 /** Chamar com `mainWindow.webContents.session` após criar a janela. */
 export function setupHidPermissions(session) {
